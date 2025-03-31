@@ -5,7 +5,6 @@ yfinance
 textblob
 pyttsx3
 SpeechRecognition
-pyaudio
 openai
 plotly
 pandas
