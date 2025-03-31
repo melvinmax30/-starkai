@@ -100,27 +100,34 @@ def give_recommendation(pred, ticker):
         return f"⚠️ Caution: {ticker} is trending down. Hold or reassess."
 
 # --------------- GPT Market Commentary ---------------
+from openai import OpenAI
+
+client = OpenAI(api_key=st.secrets["openai_api_key"])
+
 def gpt_commentary(ticker, headlines, prediction):
     if not prediction:
         return "⚠️ GPT cannot generate commentary without valid market data."
+
     prompt = f"""
-You are an AI financial analyst. Analyze the current market sentiment for {ticker}:
+    You are an AI financial analyst. Analyze the current market sentiment for {ticker}:
 
-Trend: {prediction['trend']}
-Volume: {prediction['volume']}
-Recent News: {" | ".join(headlines)}
+    Trend: {prediction['trend']}
+    Volume: {prediction['volume']}
+    Recent News: {" | ".join(headlines)}
 
-Return a smart and short recommendation in plain English.
-"""
+    Provide a concise, clear market commentary and recommendation in plain English.
+    """
+
     try:
-        res = openai.ChatCompletion.create(
+        completion = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=200
         )
-        return res.choices[0].message.content.strip()
+        return completion.choices[0].message.content.strip()
     except Exception as e:
         return f"⚠️ GPT error: {e}"
+
 
 # --------------- Simulated Trading ---------------
 def simulate_trade(ticker, recommendation, enabled):
