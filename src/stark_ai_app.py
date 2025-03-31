@@ -14,7 +14,7 @@ import pandas as pd
 from email.mime.text import MIMEText
 
 # --------------- GPT Setup ---------------
-openai.api_key = st.secrets.get("openai_api_key", "")
+client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
 ALPHA_VANTAGE_API_KEY = 'VONTVIEU6DDNM23E'
 ts = TimeSeries(key=ALPHA_VANTAGE_API_KEY, output_format='pandas')
 
@@ -100,9 +100,6 @@ def give_recommendation(pred, ticker):
         return f"⚠️ Caution: {ticker} is trending down. Hold or reassess."
 
 # --------------- GPT Market Commentary ---------------
-from openai import OpenAI
-
-client = OpenAI(api_key=st.secrets["openai_api_key"])
 
 def gpt_commentary(ticker, headlines, prediction):
     if not prediction:
@@ -115,7 +112,7 @@ def gpt_commentary(ticker, headlines, prediction):
     Volume: {prediction['volume']}
     Recent News: {" | ".join(headlines)}
 
-    Provide a concise, clear market commentary and recommendation in plain English.
+    Provide a concise market commentary and clear recommendation in plain English.
     """
 
     try:
