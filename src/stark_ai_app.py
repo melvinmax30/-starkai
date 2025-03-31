@@ -1,9 +1,8 @@
-# === stark_ai_app.py (StarkAI v10.0 Quantum Upgrade - Final Fix) ===
+# === stark_ai_app.py (StarkAI v10.1 – FMP Integration Upgrade) ===
 
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import yfinance as yf
 from textblob import TextBlob
 import pyttsx3
 import speech_recognition as sr
@@ -13,9 +12,21 @@ import smtplib
 import pandas as pd
 from email.mime.text import MIMEText
 
+# --------------- Secrets Setup ---------------
+openai.api_key = st.secrets.get("openai_api_key", "")
+FMP_API_KEY = "2GEUl972EPLW79v4I5mlg7s32GkG0Kk9"
 
-# --------------- GPT Setup ---------------
-openai.api_key = st.secrets["openai_api_key"]
+# --------------- Normalize Ticker ---------------
+def normalize_ticker(ticker):
+    mapping = {
+        "BTC": "BTCUSD",
+        "ETH": "ETHUSD",
+        "GOLD": "XAUUSD",
+        "SILVER": "XAGUSD",
+        "OIL": "WTIUSD",
+        "USD": "USDEUR",
+    }
+    return mapping.get(ticker.upper(), ticker.upper())
 
 # --------------- Jarvis Voice Output ---------------
 def speak(text):
@@ -57,29 +68,34 @@ def scrape_news(ticker):
     articles = soup.find_all("a", class_="DY5T1d", limit=5)
     return [article.text for article in articles]
 
-# --------------- Stock Predictor ---------------
+# --------------- Stock Predictor via FMP ---------------
 def predict_stock(ticker):
-    data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True)
+    url = f"https://financialmodelingprep.com/api/v3/quote/{ticker}?apikey={FMP_API_KEY}"
+    response = requests.get(url)
 
-    if data.empty or ("Close" not in data.columns) or (data["Close"].isna().all()):
+    if response.status_code != 200:
         return None
 
-    latest_close = data["Close"].iloc[-1]
-    avg_close = data["Close"].mean()
-    volume = data["Volume"].iloc[-1]
-
-    if pd.isna(latest_close) or pd.isna(avg_close):
+    data = response.json()
+    if not data or not isinstance(data, list):
         return None
 
-    trend = "Up" if float(latest_close) > float(avg_close) else "Down"
+    quote = data[0]
 
-    return {
-        "latest_close": round(float(latest_close), 2),
-        "average_close": round(float(avg_close), 2),
-        "volume": int(volume),
-        "trend": trend
-    }
+    try:
+        latest_close = float(quote["price"])
+        avg_close = float(quote.get("previousClose", latest_close))
+        volume = int(quote.get("volume", 0))
+        trend = "Up" if latest_close > avg_close else "Down"
 
+        return {
+            "latest_close": round(latest_close, 2),
+            "average_close": round(avg_close, 2),
+            "volume": volume,
+            "trend": trend
+        }
+    except:
+        return None
 
 # --------------- Recommendation Engine ---------------
 def give_recommendation(pred, ticker):
@@ -150,28 +166,6 @@ def send_email(subject, body):
             smtp.send_message(msg)
     except:
         pass
-    
-# --------------- Dynamic Ticker Resolver (FMP API) ---------------
-def resolve_ticker(user_input):
-    api_key = st.secrets.get("fmp_api_key", "2GEUl972EPLW79v4I5mlg7s32GkG0Kk9")
-    base_url = "https://financialmodelingprep.com/api/v3/search"
-    params = {
-        "query": user_input.strip(),
-        "limit": 1,
-        "exchange": "NASDAQ,NYSE,CRYPTO,COMMODITY",
-        "apikey": api_key
-    }
-
-    try:
-        response = requests.get(base_url, params=params)
-        data = response.json()
-        if data and 'symbol' in data[0]:
-            return data[0]['symbol']
-        else:
-            return user_input.upper()  # fallback if not found
-    except Exception as e:
-        st.warning(f"⚠️ Error resolving ticker for '{user_input}': {e}")
-        return user_input.upper()
 
 # --------------- UI ---------------
 st.set_page_config(page_title="StarkAI v10", layout="centered")
@@ -180,9 +174,7 @@ st.caption("Real-time insights. Web scraping. Voice & GPT-powered trading assist
 
 trading_enabled = st.checkbox("🔒 Enable Simulated Trading", value=False)
 tickers = st.text_input("📌 Enter Ticker(s) (e.g., AAPL, TSLA, BTC)", "")
-# Dynamically resolve all tickers from user input
-ticker_list = [resolve_ticker(t) for t in tickers.split(",") if t.strip()]
-
+ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
 
 if st.button("🎤 Use Voice Input"):
     voice_result = recognize_speech()
@@ -194,13 +186,14 @@ if st.button("🧠 Analyze Market"):
     if not ticker_list:
         st.warning("Please enter or speak a ticker.")
     else:
-        for ticker in ticker_list:
-            st.header(f"📊 {ticker}")
+        for raw_ticker in ticker_list:
+            ticker = normalize_ticker(raw_ticker)
+            st.header(f"📊 {raw_ticker}")
             with st.spinner("Analyzing..."):
 
                 # News
                 try:
-                    headlines = scrape_news(ticker)
+                    headlines = scrape_news(raw_ticker)
                     st.subheader("🗞️ News & Sentiment")
                     for i, h in enumerate(headlines, 1):
                         sentiment = analyze_sentiment(h)
@@ -220,31 +213,21 @@ if st.button("🧠 Analyze Market"):
 
                 # Jarvis Recommendation
                 st.subheader("💡 Jarvis Recommendation")
-                recommendation = give_recommendation(prediction, ticker)
+                recommendation = give_recommendation(prediction, raw_ticker)
                 st.success(recommendation)
                 speak(recommendation)
 
                 # GPT Commentary
                 st.subheader("🧠 GPT-4 Market Commentary")
-                gpt = gpt_commentary(ticker, headlines, prediction)
+                gpt = gpt_commentary(raw_ticker, headlines, prediction)
                 st.info(gpt)
 
                 # Simulated Trade
                 st.subheader("🧪 Simulated Trade")
-                trade = simulate_trade(ticker, recommendation, trading_enabled)
+                trade = simulate_trade(raw_ticker, recommendation, trading_enabled)
                 st.code(trade)
 
-                # Alerts
-                send_telegram(f"StarkAI Alert ({ticker}):\n{recommendation}")
-                send_email(f"StarkAI Update: {ticker}", recommendation)
-
-                # Chart
+                # Chart (disabled for now — FMP charts are commercial only)
                 st.subheader("📉 Price Chart")
-                try:
-                    df = yf.download(ticker, period="5d", interval="1h")
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode="lines", name=ticker))
-                    fig.update_layout(title=f"{ticker} Price", xaxis_title="Time", yaxis_title="Price")
-                    st.plotly_chart(fig, use_container_width=True)
-                except:
-                    st.warning("⚠️ Chart unavailable.")
+                st.info("📊 Chart feature using FMP data coming soon.")
+
