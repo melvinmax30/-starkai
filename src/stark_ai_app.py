@@ -59,13 +59,25 @@ def scrape_news(ticker):
 # --------------- Stock Predictor ---------------
 def predict_stock(ticker):
     data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True)
-    if data.empty or "Close" not in data or data["Close"].isna().all():
+    
+    # Handle unexpected return type or empty result
+    if not isinstance(data, pd.DataFrame) or data.empty:
         return None
+    
+    # Flatten multi-level columns if necessary
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = ['_'.join(col).strip() for col in data.columns.values]
+    
+    if "Close" not in data or data["Close"].isna().all():
+        return None
+    
     latest_close = data["Close"].iloc[-1]
     avg_close = data["Close"].mean()
     volume = data["Volume"].iloc[-1]
+
     if pd.isna(latest_close) or pd.isna(avg_close):
         return None
+
     trend = "Up" if float(latest_close) > float(avg_close) else "Down"
     return {
         "latest_close": round(float(latest_close), 2),
@@ -73,7 +85,6 @@ def predict_stock(ticker):
         "volume": int(volume),
         "trend": trend
     }
-
 # --------------- Recommendation Engine ---------------
 def give_recommendation(pred, ticker):
     if not pred:
