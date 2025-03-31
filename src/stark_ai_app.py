@@ -198,8 +198,8 @@ if st.button("🧠 Analyze Market"):
                 trade = simulate_trade(ticker, recommendation, trading_enabled)
                 st.code(trade)
 
-                send_telegram(f"StarkAI Alert ({ticker}):
-{recommendation}")
+                send_telegram(f"StarkAI Alert ({ticker}): {recommendation}")
+
                 send_email(f"StarkAI Update: {ticker}", recommendation)
 
                 st.subheader("📉 Price Chart")
