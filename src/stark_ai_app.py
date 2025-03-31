@@ -58,8 +58,12 @@ def scrape_news(ticker):
 
 # --------------- Stock Predictor ---------------
 def predict_stock(ticker):
-    data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True)
-    
+    try:
+        data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True, progress=False)
+        if data.empty:
+        st.error(f"❌ No market data returned for {ticker}. Possibly rate-limited.")
+            return None
+            
     # Handle unexpected return type or empty result
     if not isinstance(data, pd.DataFrame) or data.empty:
         return None
@@ -68,7 +72,8 @@ def predict_stock(ticker):
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = ['_'.join(col).strip() for col in data.columns.values]
     
-    if "Close" not in data or data["Close"].isna().all():
+    if "Close" not in data.columns or data["Close"].isna().all():
+    st.error(f"❌ No 'Close' data available for {ticker}. Check if ticker is valid.")
         return None
     
     latest_close = data["Close"].iloc[-1]
