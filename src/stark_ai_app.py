@@ -7,6 +7,7 @@ from textblob import TextBlob
 import pyttsx3
 import speech_recognition as sr
 import openai
+from openai import OpenAI
 import plotly.graph_objects as go
 import smtplib
 import pandas as pd
@@ -15,6 +16,7 @@ from email.mime.text import MIMEText
 # --------------- Secrets Setup ---------------
 openai.api_key = st.secrets.get("openai_api_key", "")
 FMP_API_KEY = "2GEUl972EPLW79v4I5mlg7s32GkG0Kk9"
+client = OpenAI(api_key=st.secrets["openai_api_key"])
 
 # --------------- Normalize Ticker ---------------
 def normalize_ticker(ticker):
@@ -122,10 +124,10 @@ Recent News: {" | ".join(headlines)}
 Return a smart and short recommendation in plain English.
 """
     try:
-        res = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200
+    res = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=200
         )
         return res.choices[0].message.content.strip()
     except Exception as e:
