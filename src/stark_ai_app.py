@@ -60,36 +60,34 @@ def scrape_news(ticker):
 def predict_stock(ticker):
     try:
         data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True, progress=False)
-    if data.empty:
-    st.error(f"❌ No market data returned for {ticker}. Possibly rate-limited.")
-    return None
-            
-    # Handle unexpected return type or empty result
-    if not isinstance(data, pd.DataFrame) or data.empty:
-        return None
-    
-    # Flatten multi-level columns if necessary
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = ['_'.join(col).strip() for col in data.columns.values]
-    
-    if "Close" not in data.columns or data["Close"].isna().all():
-    st.error(f"❌ No 'Close' data available for {ticker}. Check if ticker is valid.")
-        return None
-    
-    latest_close = data["Close"].iloc[-1]
-    avg_close = data["Close"].mean()
-    volume = data["Volume"].iloc[-1]
+        if data.empty:
+            st.error(f"❌ No market data returned for {ticker}. Possibly rate-limited.")
+            return None
 
-    if pd.isna(latest_close) or pd.isna(avg_close):
-        return None
+        if "Close" not in data.columns or data["Close"].isna().all():
+            st.error(f"❌ No 'Close' data available for {ticker}. Check if ticker is valid.")
+            return None
 
-    trend = "Up" if float(latest_close) > float(avg_close) else "Down"
-    return {
-        "latest_close": round(float(latest_close), 2),
-        "average_close": round(float(avg_close), 2),
-        "volume": int(volume),
-        "trend": trend
-    }
+        latest_close = data["Close"].iloc[-1]
+        avg_close = data["Close"].mean()
+        volume = data["Volume"].iloc[-1]
+
+        if pd.isna(latest_close) or pd.isna(avg_close):
+            st.error(f"❌ Invalid data detected for {ticker}.")
+            return None
+
+        trend = "Up" if latest_close > avg_close else "Down"
+
+        return {
+            "latest_close": round(latest_close, 2),
+            "average_close": round(avg_close, 2),
+            "volume": int(volume),
+            "trend": trend
+        }
+
+    except Exception as e:
+        st.error(f"⚠️ Error fetching stock data: {e}")
+        return None
 # --------------- Recommendation Engine ---------------
 def give_recommendation(pred, ticker):
     if not pred:
