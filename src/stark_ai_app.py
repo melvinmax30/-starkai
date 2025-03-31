@@ -3,7 +3,7 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import yfinance as yf
+from alpha_vantage.timeseries import TimeSeries
 from textblob import TextBlob
 import pyttsx3
 import speech_recognition as sr
@@ -15,6 +15,8 @@ from email.mime.text import MIMEText
 
 # --------------- GPT Setup ---------------
 openai.api_key = st.secrets.get("openai_api_key", "")
+ALPHA_VANTAGE_API_KEY = 'VONTVIEU6DDNM23E'
+ts = TimeSeries(key=ALPHA_VANTAGE_API_KEY, output_format='pandas')
 
 # --------------- Jarvis Voice Output ---------------
 def speak(text):
@@ -59,22 +61,19 @@ def scrape_news(ticker):
 # --------------- Stock Predictor ---------------
 def predict_stock(ticker):
     try:
-        data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True, progress=False)
+        data, meta_data = ts.get_intraday(symbol=ticker, interval='60min', outputsize='compact')
+
         if data.empty:
-            st.error(f"❌ No market data returned for {ticker}. Possibly rate-limited.")
+            st.error(f"❌ No market data returned for {ticker}. Check symbol or API limits.")
             return None
 
-        if "Close" not in data.columns or data["Close"].isna().all():
-            st.error(f"❌ No 'Close' data available for {ticker}. Check if ticker is valid.")
-            return None
-
+        data = data.sort_index()  # Ensure data is sorted by time (ascending)
+        
+        data.columns = ["Open", "High", "Low", "Close", "Volume"]
+        
         latest_close = data["Close"].iloc[-1]
         avg_close = data["Close"].mean()
         volume = data["Volume"].iloc[-1]
-
-        if pd.isna(latest_close) or pd.isna(avg_close):
-            st.error(f"❌ Invalid data detected for {ticker}.")
-            return None
 
         trend = "Up" if latest_close > avg_close else "Down"
 
@@ -86,8 +85,9 @@ def predict_stock(ticker):
         }
 
     except Exception as e:
-        st.error(f"⚠️ Error fetching stock data: {e}")
+        st.error(f"⚠️ Alpha Vantage API error: {e}")
         return None
+
 # --------------- Recommendation Engine ---------------
 def give_recommendation(pred, ticker):
     if not pred:
@@ -217,14 +217,14 @@ if st.button("🧠 Analyze Market"):
                 send_email(f"StarkAI Update: {ticker}", recommendation)
 
                 st.subheader("📉 Price Chart")
-                try:
-                    df = yf.download(ticker, period="5d", interval="1h")
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode="lines", name=ticker))
-                    fig.update_layout(title=f"{ticker} Price", xaxis_title="Time", yaxis_title="Price")
-                    st.plotly_chart(fig, use_container_width=True)
-                except:
-                    st.warning("⚠️ Chart unavailable.")
+try:
+    df, meta_data = ts.get_intraday(symbol=ticker, interval='60min', outputsize='compact')
+    df = df.sort_index()
+    df.columns = ["Open", "High", "Low", "Close", "Volume"]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode="lines", name=ticker))
+    fig.update_layout(title=f"{ticker} Price", xaxis_title="Time", yaxis_title="Price")
+    st.plotly_chart(fig, use_container_width=True)
 
-
-
+except Exception as e:
+    st.warning(f"⚠️ Chart unavailable: {e}")
