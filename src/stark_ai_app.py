@@ -62,7 +62,7 @@ def predict_stock(ticker):
     data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True)
 
     # Catch empty or invalid data
-    if data.empty or "Close" not in data or data['Close'].isna().all():
+   if data.empty or ("Close" not in data.columns) or (data["Close"].isna().all()):
         return None
 
     # Safely extract the latest values
