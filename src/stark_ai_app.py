@@ -58,24 +58,19 @@ def scrape_news(ticker):
     return [article.text for article in articles]
 
 # --------------- Stock Predictor ---------------
-
-    def predict_stock(ticker):
+def predict_stock(ticker):
     data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True)
 
     if data.empty or ("Close" not in data.columns) or (data["Close"].isna().all()):
         return None
 
+    latest_close = data["Close"].iloc[-1]
+    avg_close = data["Close"].mean()
+    volume = data["Volume"].iloc[-1]
 
-    # Safely extract the latest values
-    latest_close = data['Close'].iloc[-1]
-    avg_close = data['Close'].mean()
-    volume = data['Volume'].iloc[-1]
-
-    # Double-check for NaNs or wrong types
     if pd.isna(latest_close) or pd.isna(avg_close):
         return None
 
-    # FIXED LINE
     trend = "Up" if float(latest_close) > float(avg_close) else "Down"
 
     return {
@@ -84,7 +79,6 @@ def scrape_news(ticker):
         "volume": int(volume),
         "trend": trend
     }
-
 
 
 # --------------- Recommendation Engine ---------------
