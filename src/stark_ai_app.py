@@ -155,6 +155,28 @@ def send_email(subject, body):
             smtp.send_message(msg)
     except:
         pass
+    
+# --------------- Dynamic Ticker Resolver (FMP API) ---------------
+def resolve_ticker(user_input):
+    api_key = st.secrets.get("fmp_api_key", "2GEUl972EPLW79v4I5mlg7s32GkG0Kk9")
+    base_url = "https://financialmodelingprep.com/api/v3/search"
+    params = {
+        "query": user_input.strip(),
+        "limit": 1,
+        "exchange": "NASDAQ,NYSE,CRYPTO,COMMODITY",
+        "apikey": api_key
+    }
+
+    try:
+        response = requests.get(base_url, params=params)
+        data = response.json()
+        if data and 'symbol' in data[0]:
+            return data[0]['symbol']
+        else:
+            return user_input.upper()  # fallback if not found
+    except Exception as e:
+        st.warning(f"⚠️ Error resolving ticker for '{user_input}': {e}")
+        return user_input.upper()
 
 # --------------- UI ---------------
 st.set_page_config(page_title="StarkAI v10", layout="centered")
@@ -163,7 +185,9 @@ st.caption("Real-time insights. Web scraping. Voice & GPT-powered trading assist
 
 trading_enabled = st.checkbox("🔒 Enable Simulated Trading", value=False)
 tickers = st.text_input("📌 Enter Ticker(s) (e.g., AAPL, TSLA, BTC)", "")
-ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+# Dynamically resolve all tickers from user input
+ticker_list = [resolve_ticker(t) for t in tickers.split(",") if t.strip()]
+
 
 if st.button("🎤 Use Voice Input"):
     voice_result = recognize_speech()
