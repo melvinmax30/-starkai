@@ -60,9 +60,9 @@ def scrape_news(ticker):
 def predict_stock(ticker):
     try:
         data = yf.download(ticker, period="5d", interval="1h", auto_adjust=True, progress=False)
-        if data.empty:
-        st.error(f"❌ No market data returned for {ticker}. Possibly rate-limited.")
-            return None
+    if data.empty:
+    st.error(f"❌ No market data returned for {ticker}. Possibly rate-limited.")
+    return None
             
     # Handle unexpected return type or empty result
     if not isinstance(data, pd.DataFrame) or data.empty:
